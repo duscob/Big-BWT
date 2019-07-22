@@ -76,6 +76,9 @@
  * of each word (file .occ) are used to compute the final BWT by the 
  * pfbwt algorithm.
  * 
+ * Note: if the -c option is used, the parsing is computed for compression
+ * purposes rather than for building the BWT. In this case the redundant 
+ * information (phrases overlaps and 0x2's) is not written to the output files. 
  */
 #include <assert.h>
 #include <errno.h>
@@ -393,6 +396,7 @@ void print_help(char** argv, Args &args) {
         #ifndef NOTHREADS
         << "\t-t M\tnumber of helper threads, def. none " << endl
         #endif        
+        << "\t-c  \tdiscard redundant information" << endl
         << "\t-h  \tshow help and exit" << endl
         << "\t-s  \tcompute suffix array info" << endl;
   #ifdef GZSTREAM
