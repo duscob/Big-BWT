@@ -42,13 +42,13 @@
  * is at most 2^32-1, so the size is 4p bytes
  * 
  * file.last 
- * contaning the charater in positon w+1 from the end for each dictionary word
- * Size: d
+ * containing the character in position w+1 from the end for each dictionary word
+ * Size: p
  * 
  * file.sai (if option -s is given on the command line) 
- * containing the ending position +1 of each dictionary word in the original
+ * containing the ending position +1 of each parsed word in the original
  * text written using IBYTES bytes for each entry 
- * Size: d*IBYTES
+ * Size: p*IBYTES
  * 
  * The output of newscan must be processed by bwtparse, which invoked as
  * 
@@ -68,7 +68,7 @@
  * 
  * If the option -s is given to bwtparse, it permutes file.sai according
  * to the BWT permutation and generate file.bwsai using again IBYTES
- * per entry.  file.bwsai[i] is the ending position+1 ofBWT[i] in the 
+ * per entry.  file.bwsai[i] is the ending position+1 of BWT[i] in the 
  * original text 
  * 
  * The output of bwtparse (the files .ilist .bwlast) together with the

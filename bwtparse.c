@@ -8,6 +8,10 @@
 #include "gsa/gsacak.h"
 #include "utils.h" 
 
+
+// Input: file.parse, file.last, [file.sai]
+// Output: file.ilist, file.bwlast, [file.bwsai] 
+
 // Compute the SA of a parsing and its associated BWT. 
 // Remap the chars in the .last file according to the
 // BWT/SA permutation producing the .bwlast file 
