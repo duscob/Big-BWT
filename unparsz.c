@@ -99,13 +99,13 @@ int main(int argc, char *argv[])
   if(Wstart==NULL) die("Allocation error");
   Wstart[0] = 0; // first word starts at Dict[0]
   lseek(wlen_fd,0,SEEK_SET);     // rewind 
-  read(wlen_fd,Wstart+1,4*words); // assume word lengths are 4 bytes 
+  ssize_t r = read(wlen_fd,Wstart+1,4*words); // assume word lengths are 4 bytes
+  if(r!=4*words) die("error reading from wlen file"); 
   for(long i=2;i<=words;i++)    // Wstart[i] is starting position of word i
     Wstart[i] += Wstart[i-1];   // Wstart[i+1]-1 is ending position of word i
   
   
-  // === stopped here 
-  
+  // === check starting from here 
   
   fprintf(stderr,"Found %ld dictionary words\n",words);
   fprintf(stderr,"Recovering file %s\n",arg.outname);
@@ -119,10 +119,10 @@ int main(int argc, char *argv[])
     int e = fread(&w,4,1,parse);
     if(e==0 && feof(parse)) break; // done
     if(e!=1) die("Error reading parse file");
-    if(w==0 || w-1>=words) die("Invalid word ID in the parse file");
-    s = Dict + Wstart[w-1]; // dictionary word (correctly \0 terminated)
-    e = fputs(s,f);
-    if(e==EOF) die("Error writing to the output file"); 
+    if(w==0 || w>words) die("Invalid word ID in the parse file");
+    s = Dict + Wstart[w-1]; // dictionary word starting position 
+    e = fwrite(s,1,Wstart[w]-Wstart[w-1],f);
+    if(e!=Wstart[w]-Wstart[w-1]) die("Error writing to the output file"); 
   }
   fclose(parse);
   fclose(f);
