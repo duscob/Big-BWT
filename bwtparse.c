@@ -44,6 +44,7 @@
 // together with the .occ file giving for each symbol its number of 
 // occurrences in the BWT. 
 // Once the list is computed the BWT is no longer useful and is discarded
+// (note that ilist coincides with the rnak_next array)
 
 // The parsing symbols are assumed to be 32 bit uints
 // Currently, the parsing is assumed to be of length at most 2^32-1
