@@ -290,12 +290,15 @@ uint64_t process_file(Args& arg, map<uint64_t,word_stats>& wordFreq)
 
   // open the 1st pass parsing file 
   FILE *g = open_aux_file(arg.inputFileName.c_str(),EXTPARS0,"wb");
-  // open output file containing the char at position -(w+1) of each word
-  FILE *last_file = open_aux_file(arg.inputFileName.c_str(),EXTLST,"wb");  
-  // if requested open file containing the ending position+1 of each word
-  FILE *sa_file = NULL;
-  if(arg.SAinfo) 
-    sa_file = open_aux_file(arg.inputFileName.c_str(),EXTSAI,"wb");
+  FILE *sa_file = NULL, *last_file=NULL;
+  if(!arg.compress) {
+    // open output file containing the char at position -(w+1) of each word
+    last_file = open_aux_file(arg.inputFileName.c_str(),EXTLST,"wb");  
+    // if requested open file containing the ending position+1 of each word
+    if(arg.SAinfo) 
+      sa_file = open_aux_file(arg.inputFileName.c_str(),EXTSAI,"wb");
+  }
+  
   
   // main loop on the chars of the input file
   int c;
@@ -324,7 +327,7 @@ uint64_t process_file(Args& arg, map<uint64_t,word_stats>& wordFreq)
   save_update_word(arg,word,wordFreq,g,last_file,sa_file,pos);
   // close input and output files 
   if(sa_file) if(fclose(sa_file)!=0) die("Error closing SA file");
-  if(fclose(last_file)!=0) die("Error closing last file");  
+  if(last_file) if(fclose(last_file)!=0) die("Error closing last file");  
   if(fclose(g)!=0) die("Error closing parse file");
   if(arg.compress)
     assert(pos==krw.tot_char);
@@ -383,8 +386,13 @@ void writeDictOcc(Args &arg, map<uint64_t,word_stats> &wfreq, vector<const strin
     assert(wf.rank==0);
     wf.rank = wrank++;
   }
-  if(fputc(EndOfDict,fdict)==EOF) die("Error writing EndOfDict to DICT file");
-  if(fclose(focc)!=0) die("Error closing OCC file");
+  if(arg.compress) {
+    if(fclose(fwlen)!=0) die("Error closing WLEN file");
+  }
+  else {
+    if(fputc(EndOfDict,fdict)==EOF) die("Error writing EndOfDict to DICT file");
+    if(fclose(focc)!=0) die("Error closing OCC file");
+  }
   if(fclose(fdict)!=0) die("Error closing DICT file");
 }
 
