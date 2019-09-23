@@ -16,13 +16,14 @@
 typedef struct {
    char *basename;
    char *outname;
+   int w;     // window size  
 } Args;
 
 
 static void print_help(char *name)
 {
   printf("Usage: %s <basename> [options]\n\n", name);
-  puts("Restore the original file given a prefix free parse (files .dict and .parse)");
+  puts("Restore the original file given a prefix free parse (files ."EXTDICT" and ."EXTPARSE")");
   puts("  Options:");
   puts("\t-o outfile   output file (def. <basename>.out)");
   puts("\t-w wsize     window size (def. 10)");
@@ -41,18 +42,21 @@ static void parseArgs(int argc, char** argv, Args *arg ) {
   puts("\n");
 
   arg->outname = NULL;
-  while ((c = getopt( argc, argv, "ho:") ) != -1) {
+  arg->w = 10;
+  while ((c = getopt( argc, argv, "hw:o:") ) != -1) {  
     switch(c) {
       case 'o':
       arg->outname = strdup(optarg); break;
       case 'h':
          print_help(argv[0]); exit(1);
+      case 'w':
+        arg->w = atoi(optarg); break;
       case '?':
       puts("Unknown option. Use -h for help.");
       exit(1);
     }
   }
-  // read base name as the only non-option parameter   
+  // input base name is the only non-optional parameter   
   if (argc!=optind+1) 
     print_help(argv[0]);
   arg->basename = strdup(argv[optind]);
@@ -86,7 +90,7 @@ int main(int argc, char *argv[])
   time_t start_wc = time(NULL);
   
   // mmap dictionary file to memory
-  int dict_fd = fd_open_aux_file(arg.basename,EXTDICZ,O_RDONLY);
+  int dict_fd = fd_open_aux_file(arg.basename,EXTDICT,O_RDONLY);
   Dict = mmap_fd(dict_fd,&n);
   if(close(dict_fd)!=0) die("error closing dictionary file");
   // compute # words, change terminator, and save starting points
@@ -94,7 +98,8 @@ int main(int argc, char *argv[])
   Wstart = malloc(size*sizeof(*Wstart));
   if(Wstart==NULL) die("Allocation error");
   long words = 0;
-  Wstart[0] = 0; // first word starts at Dict[0]
+  assert(Dict[0]==Dollar);
+  Wstart[0] = 1;       // word 0 is 0x2 S[0] S[1]...
   for(long i=1;i<n;i++) {
     if(Dict[i]==EndOfWord) {
       Dict[i]=0; //replace EndOfWord with a real \0
@@ -104,11 +109,12 @@ int main(int argc, char *argv[])
         Wstart = realloc(Wstart,size*sizeof(*Wstart));
         if(Wstart==NULL) die("Allocation error");
       }
-      Wstart[words] = i+1; // starting position of next word 
+      Wstart[words] = i+1; // starting position of next word  
     }
-    else assert(Dict[i]!=Dollar); // we don't expect Dollar's  
+    else if(Dict[i]==Dollar) 
+      Dict[i]=0; // replace Dollars with 0s (they appear only at the end of the text) 
   }
-  assert(Dict[Wstart[words]]==0); // last word is dummy
+  assert(Dict[Wstart[words]]==0); // last word is dummy (just a 0x0 char)
   fprintf(stderr,"Found %ld dictionary words\n",words);
   fprintf(stderr,"Recovering file %s\n",arg.outname);
   // create output file reading word id's from the parse
@@ -118,11 +124,14 @@ int main(int argc, char *argv[])
   if(parse==NULL) die("Cannot open parse file");
   while(true) {
     uint32_t w; char *s;
-    int e = fread(&w,4,1,parse);
+    int e = fread(&w,4,1,parse);   // the dictionary word id is w-1
     if(e==0 && feof(parse)) break; // done
     if(e!=1) die("Error reading parse file");
     if(w==0 || w-1>=words) die("Invalid word ID in the parse file");
-    s = Dict + Wstart[w-1]; // dictionary word (correctly \0 terminated)
+    if(w==1)
+      s = Dict+1; // == Dict+Wstart[w-1]: first word in the parsing with 0x2 removed 
+    else // skip first w chars since they overlap previous word 
+      s = Dict + Wstart[w-1] + arg.w;  // dictionary word[w:] (correctly \0 terminated)
     e = fputs(s,f);
     if(e==EOF) die("Error writing to the output file"); 
   }
