@@ -23,7 +23,8 @@ typedef struct {
 static void print_help(char *name)
 {
   printf("Usage: %s <basename> [options]\n\n", name);
-  puts("Restore the original file given a prefix free parse (files ."EXTDICT" and ."EXTPARSE")");
+  puts("Restore the original file given a prefix-free parse");
+  puts("ie files ."EXTDICT" and ."EXTPARSE);
   puts("  Options:");
   puts("\t-o outfile   output file (def. <basename>.out)");
   puts("\t-w wsize     window size (def. 10)");

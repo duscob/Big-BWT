@@ -3,7 +3,7 @@
 import sys, time, argparse, subprocess, os.path
 
 Description = """
-Tool to build the BWT for higly repetive files using the approach
+Tool to build the BWT for higly repetitive files using the approach
 described in 
 
    "Prefix-Free Parsing for Building Big BWTs"
@@ -21,7 +21,7 @@ check the correctness of the BWT by some other means (for example inverting it)
 
 # absolute path of auxiliary executables
 dirname = os.path.dirname(os.path.abspath(__file__))
-parse_exe       =  os.path.join(dirname, "newscan.x")
+parse_exe       =  os.path.join(dirname, "pscan.x")
 parseNT_exe     =  os.path.join(dirname, "newscanNT.x")
 parsebwt_exe    =  os.path.join(dirname, "bwtparse")
 parsebwt_exe64  =  os.path.join(dirname, "bwtparse64")

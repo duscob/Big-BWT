@@ -31,16 +31,19 @@ void *mt_parse(void *dx)
   }
 
   // prepare for parsing 
-  f.seekg(d->start); // move to the begining of assigned region
+  f.seekg(d->start); // move to the beginning of assigned region
   KR_window krw(arg->w);
   int c; string word = ""; 
   d->skipped = d->parsed = d->words = 0;
   if(d->start==0) {
-    if(!arg->compress) word.append(1,Dollar);// no need to reach the next kr-window 
+    if(!arg->compress) word.append(1,Dollar); // no need to reach the next kr-window 
   }
   else {   // reach the next breaking window  
     while( (c = f.get()) != EOF ) {
-      if(c<=Dollar && !arg->compress) die("Invalid char found in input file. Exiting...");
+      if(c<=Dollar && !arg->compress) {
+        // if we are not simply compressing then we cannot accept 0,1,or 2
+        cerr << "Invalid char found in input file. Exiting...\n"; exit(1);
+      }
       d->skipped++;
       if(d->start + d->skipped == d->end + arg->w) {f.close(); return NULL;} 
       word.append(1,c);
@@ -57,9 +60,12 @@ void *mt_parse(void *dx)
   // there is some parsing to do
   uint64_t pos = d->start;             // ending position+1 in text of previous word
   if(pos>0) pos+= d->skipped+ arg->w;  // or 0 for the first word  
-  assert(IBYTES<=sizeof(pos)); // IBYTES bytes of pos are written to the sa info file 
+  if(arg->SAinfo) assert(IBYTES<=sizeof(pos)); // IBYTES bytes of pos are written to the sa info file 
   while( (c = f.get()) != EOF ) {
-    if(c<=Dollar && !arg->compress) die("Invalid char found in input file. Exiting...");
+    if(c<=Dollar && !arg->compress) {
+      // if we are not simply compressing then we cannot accept 0,1,or 2
+      cerr << "Invalid char found in input file. Exiting...\n"; exit(1);
+    }
     word.append(1,c);
     uint64_t hash = krw.addchar(c);
     d->parsed++;
