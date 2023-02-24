@@ -56,8 +56,10 @@ def main():
     
   logfile_name = args.input + ".log"
   print("Sending logging messages to file:", logfile_name)
-  with open(logfile_name,"a") as logfile:  
-    
+  with open(logfile_name,"a") as logfile:
+
+    print("\n==== Execution started at", time.ctime(), file=logfile)
+    logfile.flush()
     # ---------- parsing of the input file 
     start0 = start = time.time()
     if args.t>0:

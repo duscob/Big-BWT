@@ -141,7 +141,7 @@ static void parseArgs(int argc, char** argv, Args *arg ) {
   puts("==== Command line:");
   for(int i=0;i<argc;i++)
     printf(" %s",argv[i]);
-  puts("\n");
+  puts("");
 
   arg->SAinfo = false;
   arg->th = 0;
