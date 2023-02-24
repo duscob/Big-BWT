@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
   if(f==NULL) termina("Unable to open file");
 
   long sym=0;
-  int e = fread(&sym,bytes,1,f);
+  int e = fread(&sym,1,bytes,f);
   if(e!=bytes) termina("Unable to read the first symbol");
   long runs = 1;
   long totsym = 1;
@@ -46,10 +46,10 @@ int main(int argc, char *argv[])
   long maxlen = 0;  
   while(true) {
     long newsym = 0;
-    e = fread(&newsym,bytes,1,f);
+    e = fread(&newsym,1,bytes,f);
     if(e==0) break;
     if(e<bytes) {
-      fprintf(stderr,"Unable to read a full symbol. Bytes x symbol is wrong?");
+      fprintf(stderr,"Unable to read a full symbol. Bytes x symbol is wrong?\n");
       break;
     }
     // new symbol is valid
@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
     }
     else curlen++;
   }
-  printf("File: %s\n",argv[1]);
+  printf("File: %s   [%d byte(s) x symbol]\n",argv[1],bytes);
   printf("Number of symbols: %ld\n",totsym);
   printf("Number of runs: %ld\n",runs);
   printf("Longest run: %ld (ave length: %lf)\n",maxlen,1.0*totsym/runs);
