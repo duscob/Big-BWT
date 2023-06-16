@@ -23,7 +23,7 @@ a file named infile.first/infile.last (changeable with option -o) containing for
 position pos, corresponding to the first char of a BWT run, the pair (pos,sa[pos])
 written using 5 bytes per entry (changeable with option -b).
 
-The purpose of thistool is mainly to test the correctness of bigbwt with
+The purpose of this tool is mainly to test the correctness of bigbwt with
 option -s or -e that computes the same information using prefix free parsing
 without building the full SA. 
 """

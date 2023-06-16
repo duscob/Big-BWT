@@ -16,15 +16,14 @@
 typedef struct {
    char *basename;
    char *outname;
-   int w;     // window size  
 } Args;
 
 
 static void print_help(char *name)
 {
   printf("Usage: %s <basename> [options]\n\n", name);
-  puts("Restore the original file given a prefix-free parse");
-  puts("ie files ."EXTDICT" and ."EXTPARSE);
+  puts("Restore the original file given a quasi prefix-free parse");
+  puts("ie files ."EXTDICZ" ."EXTDZLEN" and ."EXTPARSE);
   puts("  Options:");
   puts("\t-o outfile   output file (def. <basename>.out)");
   puts("\t-w wsize     window size (def. 10)");
@@ -43,21 +42,18 @@ static void parseArgs(int argc, char** argv, Args *arg ) {
   puts("\n");
 
   arg->outname = NULL;
-  arg->w = 10;
-  while ((c = getopt( argc, argv, "hw:o:") ) != -1) {  
+  while ((c = getopt( argc, argv, "ho:") ) != -1) {
     switch(c) {
       case 'o':
       arg->outname = strdup(optarg); break;
       case 'h':
          print_help(argv[0]); exit(1);
-      case 'w':
-        arg->w = atoi(optarg); break;
       case '?':
       puts("Unknown option. Use -h for help.");
       exit(1);
     }
   }
-  // input base name is the only non-optional parameter   
+  // read base name as the only non-option parameter   
   if (argc!=optind+1) 
     print_help(argv[0]);
   arg->basename = strdup(argv[optind]);
@@ -91,31 +87,27 @@ int main(int argc, char *argv[])
   time_t start_wc = time(NULL);
   
   // mmap dictionary file to memory
-  int dict_fd = fd_open_aux_file(arg.basename,EXTDICT,O_RDONLY);
+  int dict_fd = fd_open_aux_file(arg.basename,EXTDICZ,O_RDONLY);
   Dict = mmap_fd(dict_fd,&n);
   if(close(dict_fd)!=0) die("error closing dictionary file");
-  // compute # words, change terminator, and save starting points
-  long size = 1000;
-  Wstart = malloc(size*sizeof(*Wstart));
+
+  // compute # words, and save starting points
+  int wlen_fd = fd_open_aux_file(arg.basename,EXTDZLEN,O_RDONLY);
+  long size = lseek(wlen_fd, 0, SEEK_END); // move to end of gile and get position
+  assert(size%4==0); 
+  long words = size/4;
+  Wstart = malloc((words+1)*sizeof(*Wstart));
   if(Wstart==NULL) die("Allocation error");
-  long words = 0;
-  assert(Dict[0]==Dollar);
-  Wstart[0] = 1;       // word 0 is 0x2 S[0] S[1]...
-  for(long i=1;i<n;i++) {
-    if(Dict[i]==EndOfWord) {
-      Dict[i]=0; //replace EndOfWord with a real \0
-      words++;
-      if(words==size) {
-        size *=2;
-        Wstart = realloc(Wstart,size*sizeof(*Wstart));
-        if(Wstart==NULL) die("Allocation error");
-      }
-      Wstart[words] = i+1; // starting position of next word  
-    }
-    else if(Dict[i]==Dollar) 
-      Dict[i]=0; // replace Dollars with 0s (they appear only at the end of the text) 
-  }
-  assert(Dict[Wstart[words]]==0); // last word is dummy (just a 0x0 char)
+  Wstart[0] = 0; // first word starts at Dict[0]
+  lseek(wlen_fd,0,SEEK_SET);     // rewind 
+  ssize_t r = read(wlen_fd,Wstart+1,4*words); // assume word lengths are 4 bytes
+  if(r!=4*words) die("error reading from wlen file"); 
+  for(long i=2;i<=words;i++)    // Wstart[i] is starting position of word i
+    Wstart[i] += Wstart[i-1];   // Wstart[i+1]-1 is ending position of word i
+  
+  
+  // === check starting from here 
+  
   fprintf(stderr,"Found %ld dictionary words\n",words);
   fprintf(stderr,"Recovering file %s\n",arg.outname);
   // create output file reading word id's from the parse
@@ -125,16 +117,13 @@ int main(int argc, char *argv[])
   if(parse==NULL) die("Cannot open parse file");
   while(true) {
     uint32_t w; char *s;
-    int e = fread(&w,4,1,parse);   // the dictionary word id is w-1
+    int e = fread(&w,4,1,parse);
     if(e==0 && feof(parse)) break; // done
     if(e!=1) die("Error reading parse file");
-    if(w==0 || w-1>=words) die("Invalid word ID in the parse file");
-    if(w==1)
-      s = Dict+1; // == Dict+Wstart[w-1]: first word in the parsing with 0x2 removed 
-    else // skip first w chars since they overlap previous word 
-      s = Dict + Wstart[w-1] + arg.w;  // dictionary word[w:] (correctly \0 terminated)
-    e = fputs(s,f);
-    if(e==EOF) die("Error writing to the output file"); 
+    if(w==0 || w>words) die("Invalid word ID in the parse file");
+    s = Dict + Wstart[w-1]; // dictionary word starting position 
+    e = fwrite(s,1,Wstart[w]-Wstart[w-1],f);
+    if(e!=Wstart[w]-Wstart[w-1]) die("Error writing to the output file"); 
   }
   fclose(parse);
   fclose(f);

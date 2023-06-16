@@ -1,6 +1,6 @@
 /* ******************************************************************
  * simplebwt
- * Given a text T compute the its bwt via the suffix array using the 
+ * Given a text T compute its bwt via the suffix array using the 
  * SACA-K algorithm.
  * The input file cannot contain the 0x0 char that is used int the BWT as 
  * the EOF symbol. The output file has extension .Bwt and length |T|+1

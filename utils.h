@@ -17,6 +17,7 @@
 #define EXTOCC   "occ"
 #define EXTDICT  "dict"
 #define EXTDICZ  "dicz"
+#define EXTDZLEN "dicz.len"
 #define EXTLST   "last"
 #define EXTBWLST "bwlast"
 #define EXTSAI   "sai"

@@ -32,16 +32,19 @@ void *mt_parse(void *dx)
   }
 
   // prepare for parsing
-  f.seekg(d->start); // move to the begining of assigned region
+  f.seekg(d->start); // move to the beginning of assigned region
   KR_window krw(arg->w);
   int c; string word = "";
   d->skipped = d->parsed = d->words = 0;
   if(d->start==0) {
-    word.append(1,Dollar);// no need to reach the next kr-window
+    if(!arg->compress) word.append(1,Dollar); // no need to reach the next kr-window
   }
   else {   // reach the next breaking window
     while( (c = f.get()) != EOF ) {
-      if(c<=Dollar) die("Invalid char found in input file. Exiting...");
+      if(c<=Dollar && !arg->compress) {
+        // if we are not simply compressing then we cannot accept 0,1,or 2
+        cerr << "Invalid char found in input file. Exiting...\n"; exit(1);
+      }
       d->skipped++;
       if(d->true_start + d->skipped == d->true_end + arg->w) {f.close(); return NULL;}
       word.append(1,c);
@@ -57,16 +60,19 @@ void *mt_parse(void *dx)
   // there is some parsing to do
   uint64_t pos = d->start;             // ending position+1 in text of previous word
   if(pos>0) pos+= d->skipped+ arg->w;  // or 0 for the first word
-  assert(IBYTES<=sizeof(pos)); // IBYTES bytes of pos are written to the sa info file
+  if(arg->SAinfo) assert(IBYTES<=sizeof(pos)); // IBYTES bytes of pos are written to the sa info file
   while( (c = f.get()) != EOF ) {
-    if(c<=Dollar) die("Invalid char found in input file. Exiting...");
+    if(c<=Dollar && !arg->compress) {
+      // if we are not simply compressing then we cannot accept 0,1,or 2
+      cerr << "Invalid char found in input file. Exiting...\n"; exit(1);
+    }
     word.append(1,c);
     uint64_t hash = krw.addchar(c);
     d->parsed++;
     if(hash%arg->p==0 && d->parsed>arg->w) {
       // end of word, save it and write its full hash to the output file
       // pos is the ending position+1 of previous word and is updated in the next call
-      save_update_word(word,arg->w,*wordFreq,d->parse,d->last,d->sa,pos);
+      save_update_word(*arg,word,*wordFreq,d->parse,d->last,d->sa,pos);
       d->words++;
       if(d->true_start+d->skipped+d->parsed>=d->true_end+arg->w) {f.close(); return NULL;}
     }
@@ -74,7 +80,7 @@ void *mt_parse(void *dx)
   // end of file reached
   // virtually add w null chars at the end of the file and add the last word in the dict
   word.append(arg->w,Dollar);
-  save_update_word(word,arg->w,*wordFreq,d->parse,d->last,d->sa,pos);
+  save_update_word(*arg,word,*wordFreq,d->parse,d->last,d->sa,pos);
   // close input file and return
   f.close();
   return NULL;
@@ -106,10 +112,13 @@ uint64_t mt_process_file(Args& arg, map<uint64_t,word_stats>& wf)
     assert(td[i].end<=size);
     // open the 1st pass parsing file
     td[i].parse = open_aux_file_num(arg.inputFileName.c_str(),EXTPARS0,i,"wb");
-    // open output file containing the char at position -(w+1) of each word
-    td[i].last = open_aux_file_num(arg.inputFileName.c_str(),EXTLST,i,"wb");
-    // if requested open file containing the ending position+1 of each word
-    td[i].sa = arg.SAinfo ?open_aux_file_num(arg.inputFileName.c_str(),EXTSAI,i,"wb") : NULL;
+    if(!arg.compress) {
+      // open output file containing the char at position -(w+1) of each word
+      td[i].last = open_aux_file_num(arg.inputFileName.c_str(),EXTLST,i,"wb");
+      // if requested open file containing the ending position+1 of each word
+      td[i].sa = arg.SAinfo ?open_aux_file_num(arg.inputFileName.c_str(),EXTSAI,i,"wb") : NULL;
+    }
+    else { td[i].last = td[i].sa = NULL;}
     xpthread_create(&t[i],NULL,&mt_parse,&td[i],__LINE__,__FILE__);
   }
 
@@ -123,7 +132,7 @@ uint64_t mt_process_file(Args& arg, map<uint64_t,word_stats>& wf)
     }
     // close thread-specific output files
     fclose(td[i].parse);
-    fclose(td[i].last);
+    if(td[i].last) fclose(td[i].last);
     if(td[i].sa) fclose(td[i].sa);
     if(td[i].words>0) {
       // extra check
@@ -206,7 +215,7 @@ void *mt_parse_fasta(void *dx)
       if(hash%arg->p==0 && d->parsed>arg->w) {
         // end of word, save it and write its full hash to the output file
         // pos is the ending position+1 of previous word and is updated in the next call
-        save_update_word(word,arg->w,*wordFreq,d->parse,d->last,d->sa,pos);
+        save_update_word(*arg,word,*wordFreq,d->parse,d->last,d->sa,pos);
         d->words++;
         if(d->true_start+d->skipped+d->parsed>=d->true_end+arg->w) {
           f.close(); return NULL;
@@ -218,7 +227,7 @@ void *mt_parse_fasta(void *dx)
   // end of file reached
   // virtually add w null chars at the end of the file and add the last word in the dict
   word.append(arg->w,Dollar);
-  save_update_word(word,arg->w,*wordFreq,d->parse,d->last,d->sa,pos);
+  save_update_word(*arg,word,*wordFreq,d->parse,d->last,d->sa,pos);
   // close input file and return
   f.close();
   return NULL;
@@ -279,7 +288,7 @@ uint64_t mt_process_file_fasta(Args& arg, map<uint64_t,word_stats>& wf)
         ++j;
         // check if previous thread spilled over computed start position of
         // next thread only possible in rare situations.
-        if (j && j < arg.th && th_sts[j-1] >= th_sts[j]) { 
+        if (j && j < arg.th && th_sts[j-1] >= th_sts[j]) {
           th_sts[j] = file_pos + 1;
         }
       }

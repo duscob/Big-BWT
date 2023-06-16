@@ -477,7 +477,7 @@ static int_t getlen(uint_t p, uint_t eos[], long n, uint32_t *seqid)
 // d[0..dsize-1] is the dictionary consisting of the concatenation of dictionary words
 // in lex order with EndOfWord (0x1) at the end of each word and 
 // d[size-1] = EndOfDict (0x0) at the very end. It is d[0]=Dollar (0x2)
-// since the first words starts with $. There is another word somewhere
+// since the first word starts with $. There is another word somewhere
 // ending with Dollar^wEndOfWord (it is the last word in the parsing,
 // but its lex rank is unknown).  
 static void compute_dict_bwt_lcp(uint8_t *d, long dsize,long dwords, int w, 

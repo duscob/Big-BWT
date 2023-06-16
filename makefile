@@ -4,7 +4,7 @@ CFLAGS=-O3 -Wall -std=c99 -g
 CC=gcc
 
 # main executables 
-EXECS=bwtparse bwtparse64 simplebwt simplebwt64 newscan.x pscan.x pfbwt.x pfbwt64.x unparse remap
+EXECS=bwtparse bwtparse64 simplebwt simplebwt64 newscan.x pscan.x pfbwt.x pfbwt64.x unparse unparsz remap count_runs
 # executables not using threads (and therefore not needing the thread library)
 EXECS_NT=newscanNT.x pfbwtNT.x pfbwtNT64.x
 
@@ -62,6 +62,9 @@ pfbwtNT64.x: pfbwt.cpp gsa/gsacak64.o utils.o malloc_count.o
 	$(CXX) $(CXX_FLAGS) -o $@ $^ -ldl -DNOTHREADS -DM64
 
 unparse: unparse.c utils.o malloc_count.o
+	$(CC) $(CFLAGS) -o $@ $^ -ldl
+
+unparsz: unparsz.c utils.o malloc_count.o
 	$(CC) $(CFLAGS) -o $@ $^ -ldl
 
 remap: remap.c

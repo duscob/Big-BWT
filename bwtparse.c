@@ -8,6 +8,10 @@
 #include "gsa/gsacak.h"
 #include "utils.h" 
 
+
+// Input: file.parse, file.last, [file.sai]
+// Output: file.ilist, file.bwlast, [file.bwsai] 
+
 // Compute the SA of a parsing and its associated BWT. 
 // Remap the chars in the .last file according to the
 // BWT/SA permutation producing the .bwlast file 
@@ -40,6 +44,7 @@
 // together with the .occ file giving for each symbol its number of 
 // occurrences in the BWT. 
 // Once the list is computed the BWT is no longer useful and is discarded
+// (note that ilist coincides with the rnak_next array)
 
 // The parsing symbols are assumed to be 32 bit uints
 // Currently, the parsing is assumed to be of length at most 2^32-1
@@ -136,7 +141,7 @@ static void parseArgs(int argc, char** argv, Args *arg ) {
   puts("==== Command line:");
   for(int i=0;i<argc;i++)
     printf(" %s",argv[i]);
-  puts("\n");
+  puts("");
 
   arg->SAinfo = false;
   arg->th = 0;

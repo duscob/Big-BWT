@@ -10,72 +10,22 @@
  * Usage:
  *   pscan.x wsize modulus file
  * 
- * Accepts any kind of file that does not contain the chars 0x0, 0x1, 0x2 
- * which are used internally. If input file is gzipped use pscan.x which 
- * automatically extracts the content
+ * Unless the parameter -c (compression rather than BWT construction) 
+ * the input file cannot contain the chars 0x0, 0x1, 0x2 which are used internally. 
+ * 
+ * Since the i-th thread accesses the i-th segment of the input file 
+ * random access (fseek) must be possible. If the input is gzipped 
+ * use cnewscan.x doen't use threads but automatically extracts the content
  * 
  * The parameters wsize and modulus are used to define the prefix free parsing 
  * using KR-fingerprints (see paper)
  * 
- * The algorithm computes the prefix free parsing of 
- *     T = (0x2)file_content(0x2)^wsize
- * cresting a dictionary of words D and a parsing P of T in terms of the  
- * dictionary words. Consecutive words in the parsing overlap by wsize.
- *
- * Let d denote the number of words in D and p the number of phrases in 
- * the parsing P
+ * pscan.x takes the same input and options as newscan.x and produces the same
+ * output files. The only difference is that pscan is usually faster when 
+ * using multiple threads (optioni -t). For single thread computation 
+ * use newscanNT that doesn't even compile the code for handling threads. 
  * 
- * pscan outputs the following files:
- * 
- * file.dict
- * containing the dictionary words in lexicographic order with a 0x1 at the end of
- * each word and a 0x0 at the end of the file. Size: |D| + d + 1 where
- * |D| is the sum of the word lengths
- * 
- * file.occ
- * the number of occurrences of each word in lexicographic order.
- * We assume the number of occurrences of each word is at most 2^32-1
- * so the size is 4d bytes
- * 
- * file.parse
- * containing the parse P with each word identified with its 1-based lexicographic 
- * rank (ie its position in D). We assume the number of distinct words
- * is at most 2^32-1, so the size is 4p bytes
- * 
- * file.last 
- * contaning the charater in positon w+1 from the end for each dictionary word
- * Size: d
- * 
- * file.sai (if option -s is given on the command line) 
- * containing the ending position +1 of each dictionary word in the original
- * text written using IBYTES bytes for each entry (IBYTES defined in utils.h)
- * Size: d*IBYTES
- * 
- * The output of pscan must be processed by bwtparse, which invoked as
- * 
- *    bwtparse file
- * 
- * computes the BWT of file.parse and produces file.ilist of size 4p+4 bytes
- * contaning, for each dictionary word in lexicographic order, the list 
- * of BWT positions where that word appears (ie i\in ilist(w) <=> BWT[i]=w).
- * There is also an entry for the EOF word which is not in the dictionary 
- * but is assumed to be the smallest word.  
- * 
- * In addition, bwtparse permutes file.last according to
- * the BWT permutation and generates file.bwlast such that file.bwlast[i] 
- * is the char from P[SA[i]-2] (if SA[i]==0 , BWT[i]=0 and file.bwlast[i]=0, 
- * if SA[i]==1, BWT[i]=P[0] and file.bwlast[i] is taken from P[n-1], the last 
- * word in the parsing).  
- * 
- * If the option -s is given to bwtparse, it permutes file.sai according
- * to the BWT permutation and generate file.bwsai using again IBYTES
- * per entry.  file.bwsai[i] is the ending position+1 of BWT[i] in the 
- * original text 
- * 
- * The output of bwtparse (the files .ilist .bwlast) together with the
- * dictionary itself (file .dict) and the number of occurrences
- * of each word (file .occ) are used to compute the final BWT by the 
- * pfbwt algorithm.
+ * For details on the format of input and output files see newscan.cpp 
  * 
  */
 #include <assert.h>
@@ -293,37 +243,47 @@ bool pstringCompare(const string *a, const string *b)
 // also compute the 1-based rank for each hash
 void writeDictOcc(Args &arg, MTmaps &mtmaps, vector<const string *> &sortedDict)
 {
-  FILE *fdict;
+  FILE *fdict, *fwlen=NULL, *focc=NULL;
   // open dictionary and occ files
-  if(arg.compress)
+  if(arg.compress) {
     fdict = open_aux_file(arg.inputFileName.c_str(),EXTDICZ,"wb");
-  else
+    fwlen = open_aux_file(arg.inputFileName.c_str(),EXTDZLEN,"wb");
+  }
+  else {
     fdict = open_aux_file(arg.inputFileName.c_str(),EXTDICT,"wb");
-  FILE *focc = open_aux_file(arg.inputFileName.c_str(),EXTOCC,"wb");
+    focc = open_aux_file(arg.inputFileName.c_str(),EXTOCC,"wb");
+  }
   
   word_int_t wrank = 1; // current word rank (1 based)
   for(auto x: sortedDict) {
     const char *word = (*x).data();       // current dictionary word
-    int offset=0; size_t len = (*x).size();  // offset and length of word
-    assert(len>(size_t)arg.w);
-    if(arg.compress) {  // if we are compressing remove overlapping and extraneous chars
-      len -= arg.w;     // remove the last w chars 
-      if(word[0]==Dollar) {offset=1; len -= 1;} // remove the very first Dollar
-    }
-    size_t s = fwrite(word+offset,1,len, fdict);
-    if(s!=len) die("Error writing to DICT file");
-    if(fputc(EndOfWord,fdict)==EOF) die("Error writing EndOfWord to DICT file");
+    size_t len = (*x).size();  // offset and length of word
+    assert(len>(size_t)arg.w || arg.compress);
     uint64_t hash = kr_hash(*x);
     auto& wf = (mtmaps.maps[hash%mtmaps.n]).at(hash);
     assert(wf.occ>0);
-    s = fwrite(&wf.occ,sizeof(wf.occ),1, focc);
-    if(s!=1) die("Error writing to OCC file");
+    size_t s = fwrite(word,1,len, fdict);
+    if(s!=len) die("Error writing to DICT file");
+    if(arg.compress) {
+      s = fwrite(&len,4,1,fwlen);
+      if(s!=1) die("Error writing to WLEN file");
+    }
+    else {
+      if(fputc(EndOfWord,fdict)==EOF) die("Error writing EndOfWord to DICT file");
+      s = fwrite(&wf.occ,sizeof(wf.occ),1, focc);
+      if(s!=1) die("Error writing to OCC file");
+    }
     assert(wf.rank==0);
     wf.rank = wrank++;
   }
-  if(fputc(EndOfDict,fdict)==EOF) die("Error writing EndOfDict to DICT file");
-  if(fclose(focc)!=0) die("Error closing OCC file");
-  if(fclose(fdict)!=0) die("Error closing DICT file");
+  if(arg.compress) {
+    if(fclose(fwlen)!=0) die("Error closing WLEN file");
+  }
+  else {
+    if(fputc(EndOfDict,fdict)==EOF) die("Error writing EndOfDict to DICT file");
+    if(fclose(focc)!=0) die("Error closing OCC file");
+  }
+  if(fclose(fdict)!=0) die("Error closing DICT file");  
 }
 
 void remapParse(Args &arg, MTmaps &mtmaps)
@@ -361,6 +321,7 @@ void print_help(char** argv, Args &args) {
         << "\t-w W\tsliding window size, def. " << args.w << endl
         << "\t-p M\tmodulo for defining phrases, def. " << args.p << endl
         << "\t-t M\tnumber of helper threads, def. 4 " << endl
+        << "\t-c  \tdiscard redundant information" << endl
         << "\t-h  \tshow help and exit" << endl
         << "\t-s  \tcompute suffix array info" << endl;
   exit(1);
@@ -415,11 +376,15 @@ void parseArgs( int argc, char** argv, Args& arg ) {
      exit(1);
    }
    if(arg.p<10) {
-     cout << "Modulus must be at leas 10\n";
+     cout << "Modulus must be at least 10\n";
      exit(1);
    }
    if(arg.th<=0) {
      cout << "There must be at least one helper thread\n";
+     exit(1);
+   }
+   if(arg.compress && arg.SAinfo) {
+     cout << "Options -c and -s are incompatible\n";
      exit(1);
    }
 }
