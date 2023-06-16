@@ -246,14 +246,16 @@ int main(int argc, char *argv[])
 
   // transform SA->BWT inplace and write remapped last array, and possibly sainfo
   sa_index_t *BWTsa = SA; // BWT overlapping SA
-  assert(n>1);
+  assert(n>0);
   // first BWT symbol
   assert(SA[0]==n);
-  BWTsa[0] = Text[n-1];
-  if(fputc(last[n-2],lastout)==EOF) die("bwlast output 1");
-  if(arg.SAinfo) get_and_write_myint(sa_info,n,n-1,sa_out); // ending position+1 of Text[n-1] in original text T (is |T|+w) 
+  // The first case can be covered in the next for-loop when SA[i]==n.
+  // Notice that this first case initialization fails when n==1, so it is better to handle it in the for-loop.
+//  BWTsa[0] = Text[n-1];
+//  if(fputc(last[n-2],lastout)==EOF) die("bwlast output 1");
+//  if(arg.SAinfo) get_and_write_myint(sa_info,n,n-1,sa_out); // ending position+1 of Text[n-1] in original text T (is |T|+w)
   // 2nd, 3rd etc BWT symbols 
-  for(long i=1;i<=n;i++) {
+  for(long i=0;i<=n;i++) {
     if(SA[i]==0) {  
       assert(i==1);  // Text[0]=$abc... is the second lex word 
       BWTsa[i] = 0;   // eos in BWT, there is no phrase in D corresponding to this symbol so we write dummy values
